@@ -4,7 +4,7 @@ chai.use require 'sinon-chai'
 
 expect = chai.expect
 
-describe 'leaderboard', ->
+describe 'streetfood', ->
   beforeEach ->
     @robot =
       respond: sinon.spy()
@@ -13,7 +13,7 @@ describe 'leaderboard', ->
       	data: {}
       }
 
-    require('../src/leaderboard')(@robot)
+    require('../src/streetfood')(@robot)
 
   it 'registers a respond listener', ->
     expect(@robot.respond).to.have.been.calledWith(//)
