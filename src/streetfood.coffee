@@ -107,7 +107,11 @@ chooseVendor = (scoredVendors) ->
   return undefined
 
 msgVendorInfo = (msg, scoredVendor, city) ->
-  msg.send "#{scoredVendor.vendor.name} - #{scoredVendor.open} - #{scoredVendor.distance} - #{scoredVendor.vendor.rating} score - #{formatUrl(scoredVendor.vendor, city)}"
+  vendorInfo = "#{scoredVendor.vendor.name} - #{scoredVendor.open}"
+  if scoredVendor.distance != "unknown"
+    vendorInfo += " - #{scoredVendor.distance}"
+    vendorInfo += " - #{scoredVendor.vendor.rating} fans - #{formatUrl(scoredVendor.vendor, city)}"
+  msg.send vendorInfo
 
 msgVendorPicture = (msg, vendor) ->
   if vendor.images? and vendor.images.header and vendor.images.header.length > 0
