@@ -110,7 +110,7 @@ msgVendorInfo = (msg, scoredVendor, city) ->
   vendorInfo = "#{scoredVendor.vendor.name} - #{scoredVendor.open}"
   if scoredVendor.distance != "unknown"
     vendorInfo += " - #{scoredVendor.distance}"
-    vendorInfo += " - #{scoredVendor.vendor.rating} fans - #{formatUrl(scoredVendor.vendor, city)}"
+  vendorInfo += " - #{scoredVendor.vendor.rating} fans - #{formatUrl(scoredVendor.vendor, city)}"
   msg.send vendorInfo
 
 msgVendorPicture = (msg, vendor) ->

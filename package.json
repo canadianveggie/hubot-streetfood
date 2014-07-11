@@ -1,7 +1,7 @@
 {
   "name": "hubot-streetfood",
   "description": "Hubot script for locating food carts",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": "Christopher Porter <chris@pulseenergy.com>",
   "license": "MIT",
 
