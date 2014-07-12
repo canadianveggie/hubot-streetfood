@@ -121,8 +121,8 @@ getLocationDetails = (location_request) ->
   return {city: location_request.toLowerCase()}
 
 module.exports = (robot) ->
-  robot.respond /(streetfood|food( )?cart(s)?)( in (\w+))?/i, (msg) ->
-    location = getLocationDetails(msg.match[5])
+  robot.respond /(street( )?food|food( )?cart(s)?)( in (\w+))?/i, (msg) ->
+    location = getLocationDetails(msg.match[6])
     return msg.send "I don't know where look for food carts in" unless location.city
 
     getVendors robot, location.city, (error, vendors) ->
@@ -136,9 +136,9 @@ module.exports = (robot) ->
       msgVendorInfo msg, choice, location.city
       msgVendorPicture msg, choice.vendor
 
-  robot.respond /top (\d+) (streetfood|food( )?cart(s)?)( in (\w+))?/i, (msg) ->
+  robot.respond /top (\d+) (street( )?food|food( )?cart(s)?)( in (\w+))?/i, (msg) ->
     n = +msg.match[1]
-    location = getLocationDetails(msg.match[6])
+    location = getLocationDetails(msg.match[7])
     return msg.send "I don't know where look for food carts in" unless location.city
 
     getVendors robot, location.city, (error, vendors) ->
