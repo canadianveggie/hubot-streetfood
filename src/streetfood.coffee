@@ -40,7 +40,7 @@ getVendors = (robot, city, callback) ->
       else
         vendors = (JSON.parse body).vendors
         vendors = (v for k,v of vendors)
-        vendorCache[city] = vendors : vendors, expires : now + 1000*60*60 # 1 hour expiry
+        vendorCache[city] = vendors : vendors, expires : now + 1000*60*5 # 5 minute expiry
         callback(err, vendors)
 
 calculateOpenStateAndScore = (vendor, now) ->
