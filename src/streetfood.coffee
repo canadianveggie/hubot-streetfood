@@ -20,14 +20,15 @@
 web_url = 'http://streetfoodapp.com/'
 api_url = "http://data.streetfoodapp.com/1.1/"
 
-default_city = process.env.HUBOT_STREETFOOD_DEFAULT_CITY
-default_lat = process.env.HUBOT_STREETFOOD_DEFAULT_LAT
-default_lng = process.env.HUBOT_STREETFOOD_DEFAULT_LNG
+default_location = {
+  city: process.env.HUBOT_STREETFOOD_DEFAULT_CITY,
+  latitude: process.env.HUBOT_STREETFOOD_DEFAULT_LAT,
+  longitude: process.env.HUBOT_STREETFOOD_DEFAULT_LNG
+}
 
 vendorCache = {}
 
 getVendors = (robot, city, callback) ->
-  city or= default_city
   now = new Date().getTime()
   if city of vendorCache and vendorCache[city].expires > now
     return callback(null, vendorCache[city].vendors)
@@ -112,49 +113,41 @@ msgVendorInfo = (msg, scoredVendor, city) ->
   msg.send vendorInfo
 
 msgVendorPicture = (msg, vendor) ->
-  if vendor.images? and vendor.images.header and vendor.images.header.length > 0
+  if vendor.images?.header?.length
     msg.send msg.random vendor.images.header
+
+getLocationDetails = (location_request) ->
+  return default_location unless location_request
+  return {city: location_request.toLowerCase()}
 
 module.exports = (robot) ->
   robot.respond /(streetfood|food( )?cart(s)?)( in (\w+))?/i, (msg) ->
-    city = default_city
-    latitude = default_lat
-    longitude = default_lng
-    city = msg.match[5] or default_city
-    if !city?
-      return msg.send "I don't know what city to look for food carts in"
-    city = city.toLowerCase()
-    if city != default_city
-      latitude = undefined
-      longitude = undefined
-    getVendors robot, city, (error, vendors) ->
-      if !vendors?
-        return msg.send "No food carts found in #{city}"
-      scoredVendors = scoreVendors(vendors, latitude, longitude)
+    location = getLocationDetails(msg.match[5])
+    return msg.send "I don't know where look for food carts in" unless location.city
+
+    getVendors robot, location.city, (error, vendors) ->
+      return msg.send "No food carts found in #{location.city}" unless vendors?.length
+
+      scoredVendors = scoreVendors(vendors, location.latitude, location.longitude)
       choice = chooseVendor(scoredVendors)
-      if !choice?
-        return msg.send "Sorry, I couldn't find any food carts"
-      msgVendorInfo msg, choice, city
+
+      return msg.send "Sorry, I couldn't find any food carts" unless choice?
+
+      msgVendorInfo msg, choice, location.city
       msgVendorPicture msg, choice.vendor
 
   robot.respond /top (\d+) (streetfood|food( )?cart(s)?)( in (\w+))?/i, (msg) ->
     n = +msg.match[1]
-    latitude = default_lat
-    longitude = default_lng
-    city = msg.match[6] or default_city
-    if !city?
-      return msg.send "I don't know what city to look for food carts in"
-    city = city.toLowerCase()
-    if city != default_city
-      latitude = undefined
-      longitude = undefined
-    getVendors robot, city, (error, vendors) ->
-      if !vendors?
-        return msg.send "No food carts found in #{city}"
-      scoredVendors = scoreVendors(vendors, latitude, longitude)
+    location = getLocationDetails(msg.match[6])
+    return msg.send "I don't know where look for food carts in" unless location.city
+
+    getVendors robot, location.city, (error, vendors) ->
+      return msg.send "No food carts found in #{location.city}" unless vendors?.length
+
+      scoredVendors = scoreVendors(vendors, location.latitude, location.longitude)
       scoredVendors = scoredVendors.filter (a) -> return a.score > 0
       scoredVendors.sort (a,b) -> return b.score - a.score
       topN = scoredVendors.slice(0, n)
       for scoredVendor in topN
-        msgVendorInfo msg, scoredVendor, city
+        msgVendorInfo msg, scoredVendor, location.city
 
