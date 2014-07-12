@@ -26,23 +26,25 @@ default_location = {
   longitude: process.env.HUBOT_STREETFOOD_DEFAULT_LNG
 }
 
+user_agent = "Hubot Streetfood Engine"
+
 vendorCache = {}
 
 getVendors = (robot, city, callback) ->
   now = new Date().getTime()
+  city = city.toLowerCase().replace(/\W/g, "-",)
   if city of vendorCache and vendorCache[city].expires > now
     return callback(null, vendorCache[city].vendors)
 
   robot.http("#{api_url}schedule/#{city}/")
-    .headers("User-Agent": "Hubot Streetfood Engine", "Accept": "application/json")
+    .headers("User-Agent": user_agent: "Accept": "application/json")
     .get() (err, res, body) ->
-      if err or res.statusCode < 200 or res.statusCode >= 300
-        callback(err or body)
-      else
-        vendors = (JSON.parse body).vendors
-        vendors = (v for k,v of vendors)
-        vendorCache[city] = vendors : vendors, expires : now + 1000*60*5 # 5 minute expiry
-        callback(err, vendors)
+      return callback(err or body) if err or res.statusCode < 200 or res.statusCode >= 300
+
+      vendors = (JSON.parse body).vendors
+      vendors = (v for k,v of vendors)
+      vendorCache[city] = vendors : vendors, expires : now + 1000*60*5 # 5 minute expiry
+      callback(err, vendors)
 
 calculateOpenStateAndScore = (vendor, now) ->
   now or= new Date().getTime()
@@ -61,7 +63,7 @@ calculateOpenStateAndScore = (vendor, now) ->
     return score:0, state:"Long Term Closure" # permanently closed?
 
 calculateDistance = (vendor, latitude, longitude) ->
-  if latitude? and longitude? and vendor.open.length > 0
+  if latitude? and longitude? and vendor.open?.length
     vendorLatitude = vendor.open[0].latitude
     vendorLongitude = vendor.open[0].longitude
     x_dist = (longitude - vendorLongitude) * Math.cos(vendorLatitude / 360 * 2 * Math.PI) * 110.54 # km
@@ -89,7 +91,7 @@ scoreVendors = (vendors, latitude, longitude) ->
     openScoreAndState = calculateOpenStateAndScore(vendor, now)
     distance = calculateDistance(vendor, latitude, longitude)
     distanceScore = Math.pow(10, -1 * distance)
-    ratingScore = Math.log(vendor.rating)
+    ratingScore = Math.log(Math.max(vendor.rating, 1))
 
     scores.push score: openScoreAndState.score * distanceScore * ratingScore, open: openScoreAndState.state, distance: formatDistance(distance), vendor:vendor
   return scores
@@ -116,38 +118,61 @@ msgVendorPicture = (msg, vendor) ->
   if vendor.images?.header?.length
     msg.send msg.random vendor.images.header
 
-getLocationDetails = (location_request) ->
-  return default_location unless location_request
-  return {city: location_request.toLowerCase()}
+getLocationDetails = (robot, location_request, callback) ->
+  return callback default_location unless location_request
+  geoLookup(robot, location_request, callback)
+
+
+geoLookup = (robot, location_request, callback) ->
+    robot.http("https://maps.googleapis.com/maps/api/geocode/json")
+      .header('User-Agent': user_agent)
+      .query({
+        address: location_request
+        sensor: false
+      })
+      .get() (err, res, body) ->
+        return callback {} if err or res.statusCode < 200 or res.statusCode >= 300
+
+        response = JSON.parse(body)
+        return callback {} unless response.results?.length
+
+        city = response.results[0].address_components.filter (c) -> "locality" in c.types
+
+        return callback {} unless city?.length
+        return callback {
+          city: city[0].short_name,
+          latitude: response.results[0].geometry.location.lat,
+          longitude: response.results[0].geometry.location.lng
+        }
 
 module.exports = (robot) ->
-  robot.respond /(street( )?food|food( )?cart(s)?)( in (\w+))?/i, (msg) ->
-    location = getLocationDetails(msg.match[6])
-    return msg.send "I don't know where look for food carts in" unless location.city
+  robot.respond /(street( )?food|food( )?cart(s)?)( (in|near) (.+))?/i, (msg) ->
+    getLocationDetails robot, msg.match[7], (location) ->
+      return msg.send "I don't know where look for food carts" unless location.city
 
-    getVendors robot, location.city, (error, vendors) ->
-      return msg.send "No food carts found in #{location.city}" unless vendors?.length
+      getVendors robot, location.city, (error, vendors) ->
+        return msg.send "No food carts found in #{location.city}" unless vendors?.length
 
-      scoredVendors = scoreVendors(vendors, location.latitude, location.longitude)
-      choice = chooseVendor(scoredVendors)
+        scoredVendors = scoreVendors(vendors, location.latitude, location.longitude)
+        choice = chooseVendor(scoredVendors)
 
-      return msg.send "Sorry, I couldn't find any food carts" unless choice?
+        return msg.send "Sorry, I couldn't find any food carts" unless choice?
 
-      msgVendorInfo msg, choice, location.city
-      msgVendorPicture msg, choice.vendor
+        msgVendorInfo msg, choice, location.city
+        msgVendorPicture msg, choice.vendor
 
-  robot.respond /top (\d+) (street( )?food|food( )?cart(s)?)( in (\w+))?/i, (msg) ->
+  robot.respond /top (\d+) (street( )?food|food( )?cart(s)?)( (in|near) (.+))?/i, (msg) ->
     n = +msg.match[1]
-    location = getLocationDetails(msg.match[7])
-    return msg.send "I don't know where look for food carts in" unless location.city
+    getLocationDetails robot, msg.match[8], (location) ->
+      return msg.send "I don't know where look for food carts" unless location.city
 
-    getVendors robot, location.city, (error, vendors) ->
-      return msg.send "No food carts found in #{location.city}" unless vendors?.length
+      getVendors robot, location.city, (error, vendors) ->
+        return msg.send "No food carts found in #{location.city}" unless vendors?.length
 
-      scoredVendors = scoreVendors(vendors, location.latitude, location.longitude)
-      scoredVendors = scoredVendors.filter (a) -> return a.score > 0
-      scoredVendors.sort (a,b) -> return b.score - a.score
-      topN = scoredVendors.slice(0, n)
-      for scoredVendor in topN
-        msgVendorInfo msg, scoredVendor, location.city
+        scoredVendors = scoreVendors(vendors, location.latitude, location.longitude)
+        scoredVendors = scoredVendors.filter (a) -> return a.score > 0
+        scoredVendors.sort (a,b) -> return b.score - a.score
+        topN = scoredVendors.slice(0, n)
+        for scoredVendor in topN
+          msgVendorInfo msg, scoredVendor, location.city
 
