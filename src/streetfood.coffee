@@ -20,7 +20,6 @@
 web_url = 'http://streetfoodapp.com/'
 api_url = "http://data.streetfoodapp.com/1.1/"
 
-api_key = process.env.HUBOT_STREETFOOD_API_KEY
 default_city = process.env.HUBOT_STREETFOOD_DEFAULT_CITY
 default_lat = process.env.HUBOT_STREETFOOD_DEFAULT_LAT
 default_lng = process.env.HUBOT_STREETFOOD_DEFAULT_LNG
@@ -33,9 +32,8 @@ getVendors = (robot, city, callback) ->
   if city of vendorCache and vendorCache[city].expires > now
     return callback(null, vendorCache[city].vendors)
 
-  auth = 'Basic ' + new Buffer("#{api_key}:").toString('base64')
   robot.http("#{api_url}schedule/#{city}/")
-    .headers("Authorization": auth, "Accept": "application/json")
+    .headers("User-Agent": "Hubot Streetfood Engine", "Accept": "application/json")
     .get() (err, res, body) ->
       if err or res.statusCode < 200 or res.statusCode >= 300
         callback(err or body)
