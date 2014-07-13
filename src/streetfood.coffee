@@ -48,7 +48,7 @@ getVendors = (robot, city, callback) ->
 
 calculateOpenStateAndScore = (vendor, now) ->
   now or= new Date().getTime()
-  if vendor.open.length > 0
+  if vendor.open?.length > 0
     nextOpen = vendor.open[0].start * 1000
     nextClose = vendor.open[0].end * 1000
     if nextOpen < now and nextClose > now + 30*60*1000 # open for next 30 minutes
@@ -114,7 +114,11 @@ msgVendorInfo = (msg, scoredVendor, city) ->
   vendorInfo += " - #{scoredVendor.vendor.rating} fans - #{formatUrl(scoredVendor.vendor, city)}"
   msg.send vendorInfo
 
-msgVendorPicture = (msg, vendor) ->
+msgVendorDetails = (msg, vendor) ->
+  if vendor.description
+    msg.send vendor.description
+  if vendor.open?.length and vendor.open[0].special
+    msg.send "*** #{vendor.open[0].special} ***"
   if vendor.images?.header?.length
     msg.send msg.random vendor.images.header
 
@@ -159,7 +163,7 @@ module.exports = (robot) ->
         return msg.send "Sorry, I couldn't find any food carts" unless choice?
 
         msgVendorInfo msg, choice, location.city
-        msgVendorPicture msg, choice.vendor
+        msgVendorDetails msg, choice.vendor
 
   robot.respond /top (\d+) (street( )?food|food( )?cart(s)?)( (in|near) (.+))?/i, (msg) ->
     n = +msg.match[1]
